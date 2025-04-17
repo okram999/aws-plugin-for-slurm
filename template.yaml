@@ -122,14 +122,6 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
-      Policies:
-        - PolicyName: DescribeTagsPolicy
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Effect: Allow
-                Action: ec2:DescribeTags
-                Resource: "*"
 
   ComputeNodeInstanceProfile:
     Type: AWS::IAM::InstanceProfile
@@ -155,7 +147,6 @@ Resources:
               - Effect: Allow
                 Action:
                   - ec2:CreateFleet
-                  - ec2:DescribeTags
                   - ec2:RunInstances
                   - ec2:TerminateInstances
                   - ec2:CreateTags
@@ -423,32 +414,17 @@ Resources:
                   exit 1
               fi
 
-              # Get instance ID using IMDSv2
-              INSTANCE_ID=$(get_metadata "instance-id" "$TOKEN")
-
-              # Get availability zone and extract region from it
-              AZ=$(get_metadata "placement/availability-zone" "$TOKEN")
-              REGION=$(echo "$AZ" | sed 's/[a-z]$//')
-
-              if [ -z "$INSTANCE_ID" ] || [ -z "$REGION" ]; then
-                  echo "Error: Failed to retrieve instance ID or region"
-                  exit 1
-              fi
-
-              # Get the Name tag value using AWS CLI with dynamic region
-              NAME_TAG=$(aws ec2 describe-tags \
-                  --filters "Name=resource-id,Values=$INSTANCE_ID" "Name=key,Values=Name" \
-                  --query "Tags[0].Value" \
-                  --output text \
-                  --region "$REGION")
+              # Get the Name tag directly from instance metadata
+              NAME_TAG=$(get_metadata "tags/instance/Name" "$TOKEN")
 
               # Check if the Name tag exists
-              if [ "$NAME_TAG" = "None" ] || [ -z "$NAME_TAG" ]; then
-                  echo "No Name tag found for instance $INSTANCE_ID"
+              if [ -z "$NAME_TAG" ]; then
+                  echo "No Name tag found for instance"
                   exit 1
               else
                   echo "$NAME_TAG"
               fi
+
               EOF
               chmod +x $SLURM_HOME/etc/aws/get_nodename
 
