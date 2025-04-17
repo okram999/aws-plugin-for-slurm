@@ -397,14 +397,57 @@ Resources:
 
               # Get dynamically the node name when launching slurmd
               cat > $SLURM_HOME/etc/aws/get_nodename <<'EOF'
-              instanceid=`/usr/bin/curl --fail -m 2 -s http://169.254.169.254/latest/meta-data/instance-id`
-              if [[ ! -z "$instanceid" ]]; then
-                 hostname=`/usr/bin/curl -s http://169.254.169.254/latest/meta-data/tags/instance/Name`
+              #!/bin/bash
+
+              # Function to get IMDSv2 token
+              get_imds_token() {
+                  TOKEN=$(curl -X PUT "http://169.254.169.254/latest/api/token" \
+                      -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" \
+                      -s)
+                  echo "$TOKEN"
+              }
+
+              # Function to get metadata using IMDSv2
+              get_metadata() {
+                  local path=$1
+                  local token=$2
+                  curl -H "X-aws-ec2-metadata-token: $token" \
+                      -s "http://169.254.169.254/latest/meta-data/${!path}"
+              }
+
+              # Get IMDSv2 token
+              TOKEN=$(get_imds_token)
+
+              if [ -z "$TOKEN" ]; then
+                  echo "Error: Failed to retrieve IMDSv2 token. Are you running this on an EC2 instance?"
+                  exit 1
               fi
-              if [ ! -z "$hostname" -a "$hostname" != "None" ]; then
-                 echo $hostname
+
+              # Get instance ID using IMDSv2
+              INSTANCE_ID=$(get_metadata "instance-id" "$TOKEN")
+
+              # Get availability zone and extract region from it
+              AZ=$(get_metadata "placement/availability-zone" "$TOKEN")
+              REGION=$(echo "$AZ" | sed 's/[a-z]$//')
+
+              if [ -z "$INSTANCE_ID" ] || [ -z "$REGION" ]; then
+                  echo "Error: Failed to retrieve instance ID or region"
+                  exit 1
+              fi
+
+              # Get the Name tag value using AWS CLI with dynamic region
+              NAME_TAG=$(aws ec2 describe-tags \
+                  --filters "Name=resource-id,Values=$INSTANCE_ID" "Name=key,Values=Name" \
+                  --query "Tags[0].Value" \
+                  --output text \
+                  --region "$REGION")
+
+              # Check if the Name tag exists
+              if [ "$NAME_TAG" = "None" ] || [ -z "$NAME_TAG" ]; then
+                  echo "No Name tag found for instance $INSTANCE_ID"
+                  exit 1
               else
-                 echo `hostname`
+                  echo "$NAME_TAG"
               fi
               EOF
               chmod +x $SLURM_HOME/etc/aws/get_nodename
