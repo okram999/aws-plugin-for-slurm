@@ -122,6 +122,14 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: DescribeTagsPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: ec2:DescribeTags
+                Resource: "*"
 
   ComputeNodeInstanceProfile:
     Type: AWS::IAM::InstanceProfile
@@ -147,6 +155,7 @@ Resources:
               - Effect: Allow
                 Action:
                   - ec2:CreateFleet
+                  - ec2:DescribeTags
                   - ec2:RunInstances
                   - ec2:TerminateInstances
                   - ec2:CreateTags
