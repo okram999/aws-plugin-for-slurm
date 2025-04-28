@@ -47,6 +47,12 @@ Parameters:
     Default: 2
     Description: Number of vCPUs for the compute node instance type
 
+  ComputeNodeMemory:
+    Type: Number
+    Default: 4
+    Description: Amount of memory for the compute instance type in GB
+
+
 Metadata: 
   AWS::CloudFormation::Interface: 
     ParameterGroups: 
@@ -62,6 +68,7 @@ Metadata:
           - HeadNodeInstanceType
           - ComputeNodeInstanceType
           - ComputeNodeCPUs
+          - ComputeNodeMemory
           - KeyPair
           - LatestAmiId
       - Label: 
@@ -82,6 +89,8 @@ Metadata:
         default: Compute Node Instance Type
       ComputeNodeCPUs: 
         default: Compute Node vCPUs
+      ComputeNodeMemory:
+        default: Compute Node memory
       KeyPair: 
         default: Key Pair
       LatestAmiId: 
@@ -309,7 +318,8 @@ Resources:
                              "MaxNodes": 100,
                              "Region": "${AWS::Region}",
                              "SlurmSpecifications": {
-                                "CPUs": "${ComputeNodeCPUs}"
+                                "CPUs": "${ComputeNodeCPUs}",
+                                "RealMemory": "${ComputeNodeMemory}"
                              },
                              "PurchasingOption": "on-demand",
                              "OnDemandOptions": {
